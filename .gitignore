@@ -9,7 +9,6 @@
 .env
 # NuGet Packages Directory
 
-projectName/
 init.cmd
 init.fsx
 
