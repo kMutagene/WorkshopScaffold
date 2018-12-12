@@ -1,6 +1,7 @@
 // Include CsbScaffold
 #load "../../.env/CsbScaffold.fsx"
 #load "Task1_Deedle.fsx"
+#nowarn "10001"
 // If you want to use the wrappers for unmanaged LAPACK functions from of FSharp.Stats 
 // include the path to the .lib folder manually to your PATH environment variable and make sure you set FSI to 64 bit
 
@@ -8,7 +9,7 @@
 // fails with "MKL service either not available, or not started" if lib folder is not included in PATH.
 //open FSharp.Stats
 //FSharp.Stats.Algebra.LinearAlgebra.Service()
-#nowarn 
+
 open System
 open FSharpAux
 open Task1_Deedle
@@ -49,16 +50,9 @@ let sameLabelCount =
     |> Array.take 15
     |> Array.map fst
 
-let onlyBiggestGroups = 
-    y
-    |> Frame.filterRows (fun key _ -> 
-        
-        let b = Array.contains (fst ontology.[key]) sameLabelCount
-        //printfn "ID: %s; mapman: %s; foundIT: %b" key (fst ontology.[key]) b
-        b)
 
 let matrix =
-    onlyBiggestGroups
+    y
     |> Frame.toArray2D
     //|> Array2D.toJaggedArray
     //|> Array.take 300  
@@ -69,15 +63,13 @@ let matrix =
 meanAcrossBiologicalReplicates.ColumnKeys
 |> Seq.toArray
 
-let keys = onlyBiggestGroups.RowKeys |> Seq.toArray
+let keys = y.RowKeys |> Seq.toArray
 
 let corr = 
     Correlation.Matrix.columnWiseCorrelationMatrix Correlation.Seq.pearson matrix
 #time
-//0.9873 
 
-//let (thr,stats) = FSharp.Stats.Testing.RMT.compute 0.9 0.001 0.01 (Matrix.toArray2D corr)
-let thr = 0.994140625
+let (thr,stats) = FSharp.Stats.Testing.RMT.compute 0.9 0.001 0.01 (Matrix.toArray2D corr)
 
 let thresholded = Matrix.map (fun x -> if x > thr then x else 0.) corr
 
