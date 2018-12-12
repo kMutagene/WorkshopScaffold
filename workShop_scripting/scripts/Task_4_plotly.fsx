@@ -9,7 +9,7 @@
 // fails with "MKL service either not available, or not started" if lib folder is not included in PATH.
 //open FSharp.Stats
 //FSharp.Stats.Algebra.LinearAlgebra.Service()
-#nowarn 
+
 open BioFSharp
 open Deedle
 open FSharpAux
@@ -19,7 +19,10 @@ open Task1_Deedle
 open FSharp.Stats
 open FSharp.Plotly
 
-/////Task 1: For each timepoint, plot the distribution of the mean values for all proteins 
+//Task 1:
+aggregateTechnicalReplicates
+
+//Task 2: For each timepoint, plot the distribution of the mean values for all proteins 
 meanAcrossBiologicalReplicates
 |> Frame.getNumericCols 
 |> Series.map (fun colkey colSeries -> Chart.Histogram(colSeries |> Series.values, Name=colkey) )
@@ -29,7 +32,7 @@ meanAcrossBiologicalReplicates
 |> Chart.Show
 
 
-/////Task 1: For a proteins of your interest, create a range plot or line plot showing the time course of its abundance and its dispersion.
+//Task 3: For a proteins of your interest, create a range plot or line plot showing the time course of its abundance and its dispersion.
 let meanPoi : float [] =
     Frame.getRow "AT1G02920.1" meanAcrossBiologicalReplicates
     |> Series.values
