@@ -633,8 +633,8 @@ NUGET
       FSharp.Core
       Microsoft.Xaml
   remote: paket-files/github.com/CSBiology/FSharp.Stats
-    FSharp.Stats (0.0.11)
-    FSharp.Stats.MSF (0.0.11)
+    FSharp.Stats (0.0.12)
+    FSharp.Stats.MSF (0.0.12)
   remote: paket-files/github.com/CSBiology/FSharpAux
     FSharpAux (0.0.12)
     FSharpAux.IO (0.0.12)
@@ -645,7 +645,7 @@ GIT
      (8b77b4f32aaa1f09c5cf436a61f6c446c27ba28e)
       path: /
   remote: https://github.com/CSBiology/FSharp.Stats.git
-     (07105e8da1132abaa72ba6794529efcb3e0d82ae)
+     (370f2983dfa34811e24425c886aca28d70dddda4)
       path: /
   remote: https://github.com/CSBiology/BioFSharp.git
      (c5f0a12fd8d0702d8dd8154c9b73f4ad8050e661)
