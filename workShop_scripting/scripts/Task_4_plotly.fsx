@@ -1,7 +1,7 @@
 // Include CsbScaffold
 #nowarn "10001"
 #load "../../.env/CsbScaffold.fsx"
-#load "Task1_Deedle.fsx"
+#load "Task_3_2_Deedle.fsx"
 // If you want to use the wrappers for unmanaged LAPACK functions from of FSharp.Stats 
 // include the path to the .lib folder manually to your PATH environment variable and make sure you set FSI to 64 bit
 
@@ -15,7 +15,7 @@ open Deedle
 open FSharpAux
 open FSharpAux.IO
 open System.IO
-open Task1_Deedle
+open Task_3_2_Deedle
 open FSharp.Stats
 open FSharp.Plotly
 
