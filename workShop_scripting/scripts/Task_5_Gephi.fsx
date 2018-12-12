@@ -1,85 +1,76 @@
 // Include CsbScaffold
 #load "../../.env/CsbScaffold.fsx"
-#load "Task_3_2_Deedle.fsx"
 #nowarn "10001"
-// If you want to use the wrappers for unmanaged LAPACK functions from of FSharp.Stats 
-// include the path to the .lib folder manually to your PATH environment variable and make sure you set FSI to 64 bit
 
-// use the following lines of code to ensure that LAPACK functionalities are enabled if you want to use them
-// fails with "MKL service either not available, or not started" if lib folder is not included in PATH.
-//open FSharp.Stats
-//FSharp.Stats.Algebra.LinearAlgebra.Service()
-
-open System
-open FSharpAux
-open Task_3_2_Deedle
 open Deedle
 open FSharp.Stats
 open FSharpGephiStreamer
 #time
 
-let applyThreshold thr m = Array2D.map (fun x -> if x > thr then x else 0.) m
+///Filter out values of a matrix which are lower than the given threshold
+let applyThreshold thr m = Array2D.map (fun x -> if abs(x) > thr then x else 0.) m
 
+///Aggregated and filtered ratios of the proteins at the given timepoint
 let timeSeriesData : Frame<string,string> = 
     let path = __SOURCE_DIRECTORY__ + @"..\..\data\AggregatedProteinQuantTable.tab"
     Frame.ReadCsv(path,indexCol = "Key",separators = "\t")
 
+///MapMan Ontology Information on the proteins
 let ontology : Frame<string,string> = 
-    let path = @"E:\Users\Lukas\Source\Repos\WorkshopScaffold\projectName\data\Arabidopsis_Ontology.tab"
+    let path = __SOURCE_DIRECTORY__ + @"..\..\data\Arabidopsis_Ontology.tab"
     Frame.ReadCsv(path,indexCol = "Key",separators = "\t")
 
+///Time Series Data in form of a matrix
 let timeSeriesMatrix =
     timeSeriesData
     |> Frame.toArray2D
     |> Matrix.ofArray2D
     |> Matrix.transpose
 
+///Pearson correlation values for all time series with all time series (Adjacency Matrix)
 let correlationMatrix = 
     Correlation.Matrix.columnWiseCorrelationMatrix Correlation.Seq.pearson timeSeriesMatrix
     |> Matrix.toArray2D
 
-#time
-
+///Critical Threshold computed by usage of RMT
 let (thr,stats) = FSharp.Stats.Testing.RMT.compute 0.9 0.001 0.01 correlationMatrix
 
-open System.Xml.Serialization
-open BioFSharp.IO
-
+///Filtered Adjacency matrix 
 let thresholdedMatrix = applyThreshold thr correlationMatrix
 
-let finalNetwork = 
+///Filtered Adjacency matrix in deedle data frame
+let thresholdedMatrixFrame =        
     thresholdedMatrix
     |> Frame.ofArray2D
     |> Frame.indexRowsWith timeSeriesData.RowKeys
     |> Frame.indexColsWith timeSeriesData.RowKeys
-    |> Frame.join JoinKind.Inner ontology
 
+///Final Result: Filtered Adjacency matrix in deedle data frame with appended ontology
+let finalNetwork = Frame.join JoinKind.Left thresholdedMatrixFrame ontology
 
+///Protein names with MapMan Number
+let nodes : Series<string,string> =
+    Frame.getCol "MapManNumber"  finalNetwork
+
+///Gephi Converter for nodeLabel
 let nodeConverter nodeLabel =
     [
         Grammar.Attribute.Label (nodeLabel);
     ]
 
+//In this step we feed the nodes into gephi. Turn on streaming in gephi!
+Series.map (fun at mm -> Streamer.addNode nodeConverter at mm) nodes
+
+///Gephi converter for labeling edges as undirected
 let edgeConverter _ = 
+
     [
         Grammar.Attribute.EdgeType Grammar.EdgeDirection.Undirected
     ]
 
-for i = 0 to (Array2D.length1 thresholdedMatrix) - 1 do Streamer.addNodeBy string i |> ignore
-
-for i = 0 to (Array2D.length1 thresholdedMatrix) - 1 do
-    Streamer.updateNode nodeConverter i i
-
-let mutable edges = 0
-for i = 0 to (Array2D.length1 thresholdedMatrix) - 1 do
-    for j = i + 1 to (Array2D.length1 thresholdedMatrix) - 1 do
-        let x = thresholdedMatrix.[i,j]
-        if x = 0. |> not then 
-            Streamer.addEdge edgeConverter edges i j x |> ignore
-            edges <- edges + 1    
-
-
-
-
-matrix.Dimensions
-corr.Dimensions
+//In this step we feed the edges into gephi.
+finalNetwork
+|> Frame.map (fun prot1 prot2 corr -> 
+    if prot1 <> prot2 && corr <> 0. then
+        Streamer.addEdge edgeConverter (prot1+prot2) prot1 prot2 corr |> ignore
+    )

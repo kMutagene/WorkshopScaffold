@@ -19,40 +19,20 @@ open Task_3_2_Deedle
 open FSharp.Stats
 open FSharp.Plotly
 
-//Task 1:
-aggregateTechnicalReplicates
 
-//Task 2: For each timepoint, plot the distribution of the mean values for all proteins 
+
+//Task 1: For each timepoint, plot the distribution of the mean values for all proteins
+//hint1: you want to create a chart for every column of the frame
+//hint2: the correct Chart function is Chart.Histogram(...)
+//The standard sizing will make the resulting plot very small. apply adequate styling to the chart.
+//Create a combined chart for better comparison
+//start with this snippet:
 meanAcrossBiologicalReplicates
 |> Frame.getNumericCols 
-|> Series.map (fun colkey colSeries -> Chart.Histogram(colSeries |> Series.values, Name=colkey) )
-|> Series.values
-|> Chart.Stack (2,0.1)
-|> Chart.withSize (1500.,1500.)
-|> Chart.Show
 
-
-//Task 3: For a proteins of your interest, create a range plot or line plot showing the time course of its abundance and its dispersion.
-let meanPoi : float [] =
-    Frame.getRow "AT1G02920.1" meanAcrossBiologicalReplicates
-    |> Series.values
-    |> Array.ofSeq
-
-let stdevPoiPos : float [] =
-    Frame.getRow "AT1G02920.1" stdevAcrossBiologicalReplicates
-    |> Series.values
-    |> Array.ofSeq
-    |> Array.mapi (fun i x -> meanPoi.[i] + x)
-
-let stdevPoiNeg : float [] =
-    Frame.getRow "AT1G02920.1" stdevAcrossBiologicalReplicates
-    |> Series.values
-    |> Array.ofSeq
-    |> Array.mapi (fun i x -> meanPoi.[i] - x)
-
-Chart.Range([1;2;3;4;5],meanPoi,stdevPoiPos,stdevPoiNeg,Color="grey",RangeColor="lightblue",Name="AT1G02920.1")
-|> Chart.withTitle("Time course of abundance and dispersion of AT1G02920.1")
-|> Chart.withX_AxisStyle("TimePoint",Showline=true,Showgrid=false)
-|> Chart.withY_AxisStyle("log2meanRatio(N14/N15)",Showline=true,Showgrid=false)
-|> Chart.Show
+//Task 2: For a proteins of your interest, create a range plot or line plot showing the time course of its abundance and its dispersion.
+//hint1: first, get the mean series for your protein of interest. you want to get one row out of the mean frame.
+//hint2: do the same for the protein for the standard deviation frame
+//hint3: the Chart.Range function needs information about the standard deviation applied to the mean in both directions.
+//hint4: example usage of the chart.Range function can be seen at http://muehlhaus.github.io/FSharp.Plotly/range-plots.html
 
