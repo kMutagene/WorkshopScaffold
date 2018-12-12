@@ -137,23 +137,4 @@ let atgToMappingAndDescription :Frame<string,string>=
 /// Task 17: Join map man bins and bin description to the final Frame.
 let annotatedF =
     Frame.join JoinKind.Left mergedF atgToMappingAndDescription
-
-/// Task 18 : tTest tp "NA" vs. tp "DA24"
-let withPAndQValues = 
-    let naReps = 
-        timePointToBiologicalReplicates |> Seq.find (fun (tp,reps) -> tp = "NA") |> snd
-    let caReps = 
-        timePointToBiologicalReplicates |> Seq.find (fun (tp,reps) -> tp = "DA24") |> snd
-    let na = mergedF |> Frame.sliceCols naReps |> Frame.toArray2D |> Array2D.toJaggedArray
-    let da = mergedF |> Frame.sliceCols caReps |> Frame.toArray2D |> Array2D.toJaggedArray
-    let pValues = 
-        Array.map2 (fun nas das -> FSharp.Stats.Testing.TTest.twoSample false (nas|> vector) (das |> vector)) na da 
-        |> Array.map (fun x -> x.PValue)
-    let pi0 = 
-        FSharp.Stats.Testing.PvalueAdjust.Qvalues.pi0_Bootstrap pValues
-    let qValues = FSharp.Stats.Testing.PvalueAdjust.Qvalues.ofPValues pi0 pValues
-    annotatedF
-    |> Frame.addCol "pValues" (Series.ofObservations (Seq.zip annotatedF.RowKeys pValues))
-    |> Frame.addCol "qValues" (Series.ofObservations (Seq.zip annotatedF.RowKeys qValues))
-        
-open FSharp.Plotly
+    
