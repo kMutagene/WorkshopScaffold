@@ -1,6 +1,6 @@
 // Include CsbScaffold
 #load "../../.env/CsbScaffold.fsx"
-#load "Task1_Deedle.fsx"
+#load "Task_3_2_Deedle.fsx"
 #nowarn "10001"
 // If you want to use the wrappers for unmanaged LAPACK functions from of FSharp.Stats 
 // include the path to the .lib folder manually to your PATH environment variable and make sure you set FSI to 64 bit
@@ -12,86 +12,68 @@
 
 open System
 open FSharpAux
-open Task1_Deedle
+open Task_3_2_Deedle
 open Deedle
 open FSharp.Stats
 open FSharpGephiStreamer
 #time
-let y : Frame<string,string> = 
-    Frame.ReadCsv(@"E:\Users\Lukas\Source\Repos\WorkshopScaffold\projectName\data\AggregatedProteinQuantTable.tab",indexCol = "Key",separators = "\t")
 
-let ontology = 
-    let path = @"E:\Users\Lukas\OneDrive - tukl\CSB\CsbScaffold\Berlin Workshop\data\proteinQuants_Filtered_Normalized_SetNaN.tab"
-    use sr = System.IO.StreamReader(path)
-    sr.ReadToEnd()
-    |> String.split '\n'
-    |> Array.map (fun x -> 
-        let cancer = String.split '\t' x
-        let mapmanNumber = 
-            if cancer.[1] = "" then 
-                ""
-            else 
-                cancer.[1] |> String.skip 4 |> String.split '.' |> fun x -> 
-                    if x.Length < 3 then "" 
-                    else
-                        x.[0] + "." + x.[1]  +  x.[2]
-        cancer.[0],(mapmanNumber,cancer.[2])
-        )
-    |> Map.ofArray
+let applyThreshold thr m = Array2D.map (fun x -> if x > thr then x else 0.) m
 
+let timeSeriesData : Frame<string,string> = 
+    let path = __SOURCE_DIRECTORY__ + @"..\..\data\AggregatedProteinQuantTable.tab"
+    Frame.ReadCsv(path,indexCol = "Key",separators = "\t")
 
-let sameLabelCount = 
+let ontology : Frame<string,string> = 
+    let path = @"E:\Users\Lukas\Source\Repos\WorkshopScaffold\projectName\data\Arabidopsis_Ontology.tab"
+    Frame.ReadCsv(path,indexCol = "Key",separators = "\t")
 
-    ontology
-    |> Map.toArray
-    |> Array.countBy (fun (id,(md,_)) -> md)
-    |> Array.filter (fun (x,y) -> x = "" |> not)
-    |> Array.sortByDescending snd
-    |> Array.take 15
-    |> Array.map fst
-
-
-let matrix =
-    y
+let timeSeriesMatrix =
+    timeSeriesData
     |> Frame.toArray2D
-    //|> Array2D.toJaggedArray
-    //|> Array.take 300  
-    //|> Array2D.ofJaggedArray
     |> Matrix.ofArray2D
     |> Matrix.transpose
 
-meanAcrossBiologicalReplicates.ColumnKeys
-|> Seq.toArray
+let correlationMatrix = 
+    Correlation.Matrix.columnWiseCorrelationMatrix Correlation.Seq.pearson timeSeriesMatrix
+    |> Matrix.toArray2D
 
-let keys = y.RowKeys |> Seq.toArray
-
-let corr = 
-    Correlation.Matrix.columnWiseCorrelationMatrix Correlation.Seq.pearson matrix
 #time
 
-let (thr,stats) = FSharp.Stats.Testing.RMT.compute 0.9 0.001 0.01 (Matrix.toArray2D corr)
+let (thr,stats) = FSharp.Stats.Testing.RMT.compute 0.9 0.001 0.01 correlationMatrix
 
-let thresholded = Matrix.map (fun x -> if x > thr then x else 0.) corr
+open System.Xml.Serialization
+open BioFSharp.IO
 
-for i = 0 to (matrix.Dimensions |> snd) - 1 do Streamer.addNodeBy string i |> ignore
+let thresholdedMatrix = applyThreshold thr correlationMatrix
 
-let nodeConverter nodeId =
+let finalNetwork = 
+    thresholdedMatrix
+    |> Frame.ofArray2D
+    |> Frame.indexRowsWith timeSeriesData.RowKeys
+    |> Frame.indexColsWith timeSeriesData.RowKeys
+    |> Frame.join JoinKind.Inner ontology
+
+
+let nodeConverter nodeLabel =
     [
-        Grammar.Attribute.Label (fst ontology.[keys.[nodeId]]);
+        Grammar.Attribute.Label (nodeLabel);
     ]
 
-let edgeConverter edgeId = 
+let edgeConverter _ = 
     [
         Grammar.Attribute.EdgeType Grammar.EdgeDirection.Undirected
-    ]    
+    ]
 
-for i = 0 to (matrix.Dimensions |> snd) - 1 do
+for i = 0 to (Array2D.length1 thresholdedMatrix) - 1 do Streamer.addNodeBy string i |> ignore
+
+for i = 0 to (Array2D.length1 thresholdedMatrix) - 1 do
     Streamer.updateNode nodeConverter i i
 
 let mutable edges = 0
-for i = 0 to (thresholded.Dimensions |> fst) - 1 do
-    for j = i + 1 to (thresholded.Dimensions |> fst) - 1 do
-        let x = thresholded.[i,j]
+for i = 0 to (Array2D.length1 thresholdedMatrix) - 1 do
+    for j = i + 1 to (Array2D.length1 thresholdedMatrix) - 1 do
+        let x = thresholdedMatrix.[i,j]
         if x = 0. |> not then 
             Streamer.addEdge edgeConverter edges i j x |> ignore
             edges <- edges + 1    
