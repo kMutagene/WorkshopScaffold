@@ -25,7 +25,7 @@ let timeSeriesData : Frame<string,string> =
     Frame.ReadCsv(path,indexCol = "Key",separators = "\t")
 
 let ontology : Frame<string,string> = 
-    let path = @"E:\Users\Lukas\Source\Repos\WorkshopScaffold\projectName\data\Arabidopsis_Ontology.tab"
+    let path = __SOURCE_DIRECTORY__ + @"..\..\data\Arabidopsis_Ontology.tab"
     Frame.ReadCsv(path,indexCol = "Key",separators = "\t")
 
 let timeSeriesMatrix =
@@ -38,48 +38,36 @@ let correlationMatrix =
     Correlation.Matrix.columnWiseCorrelationMatrix Correlation.Seq.pearson timeSeriesMatrix
     |> Matrix.toArray2D
 
-#time
-
 let (thr,stats) = FSharp.Stats.Testing.RMT.compute 0.9 0.001 0.01 correlationMatrix
-
-open System.Xml.Serialization
-open BioFSharp.IO
 
 let thresholdedMatrix = applyThreshold thr correlationMatrix
 
-let finalNetwork = 
+let thresholdedMatrixFrame =        
     thresholdedMatrix
     |> Frame.ofArray2D
     |> Frame.indexRowsWith timeSeriesData.RowKeys
     |> Frame.indexColsWith timeSeriesData.RowKeys
-    |> Frame.join JoinKind.Inner ontology
 
+let finalNetwork = Frame.join JoinKind.Left thresholdedMatrixFrame ontology
+
+let nodes : Series<string,string> =
+    Frame.getCol "MapManNumber"  finalNetwork
 
 let nodeConverter nodeLabel =
     [
         Grammar.Attribute.Label (nodeLabel);
     ]
 
+Series.map (fun at mm -> Streamer.addNode nodeConverter at mm) nodes
+
 let edgeConverter _ = 
+
     [
         Grammar.Attribute.EdgeType Grammar.EdgeDirection.Undirected
     ]
 
-for i = 0 to (Array2D.length1 thresholdedMatrix) - 1 do Streamer.addNodeBy string i |> ignore
-
-for i = 0 to (Array2D.length1 thresholdedMatrix) - 1 do
-    Streamer.updateNode nodeConverter i i
-
-let mutable edges = 0
-for i = 0 to (Array2D.length1 thresholdedMatrix) - 1 do
-    for j = i + 1 to (Array2D.length1 thresholdedMatrix) - 1 do
-        let x = thresholdedMatrix.[i,j]
-        if x = 0. |> not then 
-            Streamer.addEdge edgeConverter edges i j x |> ignore
-            edges <- edges + 1    
-
-
-
-
-matrix.Dimensions
-corr.Dimensions
+finalNetwork
+|> Frame.map (fun prot1 prot2 corr -> 
+    if prot1 <> prot2 && corr <> 0. then
+        Streamer.addEdge edgeConverter (prot1+prot2) prot1 prot2 corr |> ignore
+    )
